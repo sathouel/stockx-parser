@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="stockx-parser",
-    version="0.0.1",
+    version="0.0.2",
     author="Steven Athouel",
     author_email="sathouel@gmail.com",
     description="A simple parser for stockx plateform",
@@ -18,5 +18,5 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.8',
+    python_requires='>=3.7',
 )
