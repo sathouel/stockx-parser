@@ -1,8 +1,11 @@
 import random
+import logging
 
 from stockx_api_client import StockxClient
 
 from stockx_parser import queries
+
+logger = logging.getLogger(__name__)
 
 class StockxParser:
     def __init__(self, proxies={}, proxies_list=[{}], rotation=False, rotation_rand_rate=0.15, gateway=None):
@@ -18,7 +21,7 @@ class StockxParser:
         }
         self._proxies = proxies
         self._proxies_list = proxies_list
-        self._rotation = rotation
+        self._rotation = rotation or len(proxies_list) > 0
         self._rotation_rand_rate = rotation_rand_rate
         self._client = StockxClient(proxies=proxies, custom_headers=custom_headers, custom_cookies=custom_cookies, gateway=gateway)
 
@@ -27,6 +30,7 @@ class StockxParser:
             if random.random() > self._rotation_rand_rate or not self._rotation:
                 return
         print('Random' if randomize else '', 'Rotating proxies ...')
+        # logger.info('Random' if randomize else '', 'Rotating proxies ...')
         new_proxies = proxies
         if proxies_list:
             self._proxies_list = proxies_list
@@ -38,10 +42,12 @@ class StockxParser:
             new_proxies = self._proxies_list[random_index]
 
         print('Setting new proxies: {}'.format(new_proxies))
+        # logger.info('Setting new proxies: {}'.format(new_proxies))
         self._client.set_proxies(new_proxies)
 
     def _fetch_products_batch(self, page, limit=15, light=False):
         print('Fetching products page {} ...'.format(page))
+        # logger.info('Fetching products page {} ...'.format(page))
         self.rotate_proxies(randomize=True)
         query = queries.browse_products_light_query if light else queries.browse_products_query
         query_payload = {
@@ -85,10 +91,12 @@ class StockxParser:
             res = self._fetch_products_batch(page, limit=limit, light=light)
         except Exception as e:
             print('Error {} fetching products page {}'.format(e, page))
+            # logger.error('Error {} fetching products page {}'.format(e, page))
             return products, page, False
             
         if res.status_code != 200:
             print('Error {} fetching products page {}'.format(res.status_code, page))
+            # logger.error('Error {} fetching products page {}'.format(res.status_code, page))
             if res.status_code == 403:
                 self.rotate_proxies()
             return products, page, res
@@ -101,10 +109,12 @@ class StockxParser:
                 res = self._fetch_products_batch(page, limit=limit, light=light)
             except Exception as e:
                 print('Error {} fetching products page {}'.format(e, page))
+                # logger.error('Error {} fetching products page {}'.format(e, page))
                 return products, page, False
                 
             if res.status_code != 200:
                 print('Error {} fetching products page {}'.format(res.status_code, page))
+                # logger.error('Error {} fetching products page {}'.format(res.status_code, page))
                 if res.status_code == 403:
                     self.rotate_proxies()                
                 return products, page, res
@@ -114,6 +124,7 @@ class StockxParser:
 
     def _fetch_bids_asks_batch(self, page, transaction_type, limit=50, transaction_type_limit=50):
         print('Fetching products bids asks page {} ...'.format(page))
+        # logger.info('Fetching products bids asks page {} ...'.format(page))
         self.rotate_proxies(randomize=True)
         custom_headers = {
             "x-user-legacy-price-levels": "legacy"
@@ -159,15 +170,18 @@ class StockxParser:
         products, page = [], start_page
         if transaction_type not in ['BID', 'ASK']:
             print('Please provide valid transaction type: BID or ASK')
+            # logger.error('Please provide valid transaction type: BID or ASK')
             return products, page, False
         try:
             res = self._fetch_bids_asks_batch(page, transaction_type, limit=limit, transaction_type_limit=transaction_type_limit)
         except Exception as e:
             print('Error {} fetching products bids asks page {}'.format(e, page))
+            # logger.error('Error {} fetching products bids asks page {}'.format(e, page))
             return products, page, False
 
         if res.status_code != 200:            
             print('Error {} fetching products bids asks page {}'.format(res.status_code, page))
+            # logger.error('Error {} fetching products bids asks page {}'.format(res.status_code, page))
             if res.status_code == 403:
                 self.rotate_proxies()
             return products, page, res
@@ -180,9 +194,11 @@ class StockxParser:
                 res = self._fetch_bids_asks_batch(page, transaction_type, limit=limit, transaction_type_limit=transaction_type_limit)
             except Exception as e:
                 print('Error {} fetching products bids asks page {}'.format(e, page))
+                # logger.error('Error {} fetching products bids asks page {}'.format(e, page))
                 return products, page, False
             if res.status_code != 200:            
                 print('Error {} fetching products bids asks page {}'.format(res.status_code, page))
+                # logger.error('Error {} fetching products bids asks page {}'.format(res.status_code, page))
                 if res.status_code == 403:
                     self.rotate_proxies()    
                 return products, page, res
@@ -207,4 +223,5 @@ class StockxParser:
             if res.status_code == 403:
                 self.rotate_proxies()            
             print('Error {} fetching order {}'.format(res.status_code, url_key))
+            # logger.error('Error {} fetching order {}'.format(res.status_code, url_key))
         return res
