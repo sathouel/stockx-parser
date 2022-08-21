@@ -26,8 +26,10 @@ class StockxParser:
         self._client = StockxClient(proxies=proxies, custom_headers=custom_headers, custom_cookies=custom_cookies, gateway=gateway)
 
     def rotate_proxies(self, proxies=None, proxies_list=None, randomize=False):
+        if not self._rotation:
+            return
         if randomize:
-            if random.random() > self._rotation_rand_rate or not self._rotation:
+            if random.random() > self._rotation_rand_rate:
                 return
         print('Random' if randomize else '', 'Rotating proxies ...')
         # logger.info('Random' if randomize else '', 'Rotating proxies ...')
