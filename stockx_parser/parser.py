@@ -8,7 +8,13 @@ from stockx_parser import queries
 logger = logging.getLogger(__name__)
 
 class StockxParser:
-    def __init__(self, proxies={}, proxies_list=[{}], rotation=False, rotation_rand_rate=0.15, gateway=None):
+    def __init__(
+        self, 
+        proxies={}, 
+        proxies_list=[{}], 
+        gateway=None, 
+        rotation_options={'rotation': False, 'random_rotation':False, 'rotation_policy': 'sequential', 'rotation_rand_rate':0.15}
+    ):
         
         custom_headers = {
             'accept-language': 'fr-FR',
@@ -21,15 +27,29 @@ class StockxParser:
         }
         self._proxies = proxies
         self._proxies_list = proxies_list
-        self._rotation = rotation or len(proxies_list) > 0
-        self._rotation_rand_rate = rotation_rand_rate
+        self._proxies_index = 0
+        self._rotation = rotation_options.get('rotation')
+        self._random_rotation = rotation_options.get('random_rotation')
+        self._rotation_rand_rate = rotation_options.get('rotation_rand_rate')
+        self._rotation_policy = rotation_options.get('rotation_policy')
         self._client = StockxClient(proxies=proxies, custom_headers=custom_headers, custom_cookies=custom_cookies, gateway=gateway)
+
+    @property
+    def next_proxies_index(self):
+        if self._rotation_policy == 'random':
+            self._proxies_index = random.randint(0, len(self._proxies_list) - 1)
+        elif self._rotation_policy == 'sequential':
+            self._proxies_index = self._proxies_index + 1 if len(self._proxies_list) - 1 > self._proxies_index else 0
+        else:
+            self._proxies_index = 0
+
+        return self._proxies_index
 
     def rotate_proxies(self, proxies=None, proxies_list=None, randomize=False):
         if not self._rotation:
             return
         if randomize:
-            if random.random() > self._rotation_rand_rate:
+            if random.random() > self._rotation_rand_rate or not self._random_rotation:
                 return
         print('Random' if randomize else '', 'Rotating proxies ...')
         # logger.info('Random' if randomize else '', 'Rotating proxies ...')
@@ -40,14 +60,15 @@ class StockxParser:
         if proxies:
             self._proxies = proxies 
         else:
-            random_index = random.randint(0, len(self._proxies_list))
-            new_proxies = self._proxies_list[random_index]
+            # random_index = random.randint(0, len(self._proxies_list) - 1)
+            # new_proxies = self._proxies_list[random_index]
+            new_proxies = self._proxies_list[self.next_proxies_index]
 
         print('Setting new proxies: {}'.format(new_proxies))
         # logger.info('Setting new proxies: {}'.format(new_proxies))
         self._client.set_proxies(new_proxies)
 
-    def _fetch_products_batch(self, page, limit=15, light=False):
+    def _fetch_products_batch(self, page, limit=17, light=False):
         print('Fetching products page {} ...'.format(page))
         # logger.info('Fetching products page {} ...'.format(page))
         self.rotate_proxies(randomize=True)
