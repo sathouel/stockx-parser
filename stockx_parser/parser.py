@@ -60,19 +60,17 @@ class StockxParser:
         if proxies:
             self._proxies = proxies 
         else:
-            # random_index = random.randint(0, len(self._proxies_list) - 1)
-            # new_proxies = self._proxies_list[random_index]
             new_proxies = self._proxies_list[self.next_proxies_index]
 
         print('Setting new proxies: {}'.format(new_proxies))
         # logger.info('Setting new proxies: {}'.format(new_proxies))
         self._client.set_proxies(new_proxies)
 
-    def _fetch_products_batch(self, page, limit=17, light=False):
+    def _fetch_products_batch(self, page, limit=17):
         print('Fetching products page {} ...'.format(page))
         # logger.info('Fetching products page {} ...'.format(page))
         self.rotate_proxies(randomize=True)
-        query = queries.browse_products_light_query if light else queries.browse_products_query
+        query = queries.browse_products_query
         query_payload = {
             'operationName': "Browse",
             'query': query,
@@ -108,10 +106,10 @@ class StockxParser:
 
         return self._client.gql.query(query_payload)
 
-    def fetch_products(self, limit=15, multi_threaded=False, start_page=1, light=False):
+    def fetch_products(self, limit=15, multi_threaded=False, start_page=1):
         products, page = [], start_page
         try:
-            res = self._fetch_products_batch(page, limit=limit, light=light)
+            res = self._fetch_products_batch(page, limit=limit)
         except Exception as e:
             print('Error {} fetching products page {}'.format(e, page))
             # logger.error('Error {} fetching products page {}'.format(e, page))
@@ -129,7 +127,7 @@ class StockxParser:
             products += edges
             page += 1
             try:
-                res = self._fetch_products_batch(page, limit=limit, light=light)
+                res = self._fetch_products_batch(page, limit=limit)
             except Exception as e:
                 print('Error {} fetching products page {}'.format(e, page))
                 # logger.error('Error {} fetching products page {}'.format(e, page))
@@ -144,6 +142,35 @@ class StockxParser:
             edges = res.json()['data']['browse']['results']['edges']
         
         return products, page, True
+
+    def fetch_product_price_levels(self, product_url_key, transaction_type, limit=50, page=1, recursive=True):
+        self.rotate_proxies(randomize=True)
+        custom_headers = {
+            "x-user-legacy-price-levels": "legacy"
+        }        
+        query = queries.get_product_price_levels_query
+        query_payload = {
+            "operationName": "GetProductPriceLevels",
+            "query": query,
+            "variables": {
+                "country": "FR",
+                "currencyCode": "EUR",
+                "isVariant": False,
+                "limit": limit,
+                "page": page,
+                "productId": product_url_key,
+                "transactionType": transaction_type,
+            }            
+        }
+
+        res = self._client.gql.query(query_payload, custom_headers=custom_headers)
+        if res.status_code != 200:
+            print('Error {} fetching product price levels of {}'.format(res.status_code, product_url_key))
+            if res.status_code == 403:
+                self.rotate_proxies()
+                return self.fetch_product_price_levels(product_url_key, transaction_type, limit=limit, page=page, recursive=recursive)
+
+        return res
 
     def _fetch_bids_asks_batch(self, page, transaction_type, limit=50, transaction_type_limit=50):
         print('Fetching products bids asks page {} ...'.format(page))
@@ -229,7 +256,7 @@ class StockxParser:
         
         return products, page, True
 
-    def fetch_product_sales(self, url_key, product_id, limit=50):
+    def fetch_product_sales(self, url_key, product_id, limit=50, recursive=True):
         referer = 'https://stockx.com/fr-fr/' + url_key
         product_id = product_id
         params = {
@@ -243,8 +270,9 @@ class StockxParser:
         }
         res = self._client.products.activity(product_id).fetch_list(params=params, custom_headers={'referer': referer})        
         if res.status_code != 200:
-            if res.status_code == 403:
-                self.rotate_proxies()            
             print('Error {} fetching order {}'.format(res.status_code, url_key))
+            if res.status_code == 403:
+                self.rotate_proxies()
+                return self.fetch_product_sales(url_key, product_id, limit=limit, recursive=recursive)
             # logger.error('Error {} fetching order {}'.format(res.status_code, url_key))
         return res
