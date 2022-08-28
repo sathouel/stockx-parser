@@ -174,7 +174,6 @@ browse_bids_asks_query = '''
         node {
             count
             ownCount
-            market
             amount
             variant {
             id
@@ -223,7 +222,6 @@ fragment MarketPriceLevelsFragment on Market {
       node {
         count
         ownCount
-        market
         amount
         variant {
           id
